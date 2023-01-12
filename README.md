@@ -1,27 +1,67 @@
-# tanzu-java-web-app
-
-This is a sample of a Java Spring app that works with Tilt and the Tanzu Application Platform.
-
-## Dependencies
-1. [kubectl CLI](https://kubernetes.io/docs/tasks/tools/)
-1. [Tilt version >= v0.23.2](https://docs.tilt.dev/install.html)
-1. Tanzu CLI and the apps plugin v0.2.0 which are provided as part of [Tanzu Application Platform](https://network.tanzu.vmware.com/products/tanzu-application-platform)
-1. A cluster with Tanzu Application Platform, and the "Default Supply Chain", plus its dependencies. This supply chains is part of [Tanzu Application Platform](https://network.tanzu.vmware.com/products/tanzu-application-platform).
-
-## Running the sample
-
-Start the app deployment by running:
+# Pass workload parameters to deliverable
+## Modify deliverable-template
+kubectl edit ClusterTemplate deliverable-template
 
 ```
-tilt up
+apiVersion: carto.run/v1alpha1
+kind: Deliverable
+metadata:
+name: #@ data.values.workload.metadata.name
+...
+
+      #@ if/end is_gitops():
+      params:
+        - name: "gitops_ssh_secret"
+          value: #@ param("gitops_ssh_secret")
+        - name: #@ data.values.workload.spec.params[0].name
+          value: #@ data.values.workload.spec.params[0].value
+        - name: #@ data.values.workload.spec.params[1].name
+          value: #@ data.values.workload.spec.params[1].value
+        - name: #@ data.values.workload.spec.params[2].name
+          value: #@ data.values.workload.spec.params[2].value
 ```
 
-You can hit the spacebar to open the UI in a browser. 
+# Add an integration operation after successful deployment
 
-- > If you see an "Update error" message like the one below, then just follow the instructions and allow that context:
-    ```
-    Stop! tap-beta2 might be production.
-    If you're sure you want to deploy there, add:
-        allow_k8s_contexts('tap-beta2')
-    to your Tiltfile. Otherwise, switch k8s contexts and restart Tilt.
-    ```
+kubectl edit ClusterDelivery delivery-basic
+````
+  - deployment:
+      resource: source-provider
+    name: deployer
+    params:
+    - name: serviceAccount
+      value: default
+    templateRef:
+      kind: ClusterDeploymentTemplate
+      name: app-deploy
+  - name: integration-testing
+    deployment:
+      resource: deployer
+    templateRef:
+      kind: ClusterDeploymentTemplate
+      name: integration-test
+````
+
+# Testing workload
+``````
+tanzu apps workload update tanzu-java-web-app \
+--app tanzu-java-web-app \
+--git-repo ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/application-accelerator-samples.git \
+--git-branch main \
+--type web \
+--label app.kubernetes.io/part-of=tanzu-java-web-app \
+--yes \
+--namespace workloads \
+--sub-path tanzu-java-web-app \
+--param "git_int_testing_repo=ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/tanzu-java-web-app.git" \
+--param "git_int_testing_rev=main" \
+--param "git_int_testing_url=http://tanzu-java-web-app.workloads.apps.tap.h2o-4-2180.h2o.vmware.com/"
+
+``````
+
+
+
+
+
+
+
