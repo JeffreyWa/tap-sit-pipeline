@@ -31,28 +31,37 @@ spec:
       default: ""
     - name: git_writer_ssh_variant
       default: ssh
-  template:
-    apiVersion: carto.run/v1alpha1
-    kind: Runnable
-    metadata:
-      name: $(workload.metadata.name)$-integration-test
-    spec:
-      serviceAccountName: default
-      runTemplateRef:
-        name: integration-test
-      inputs:
-        git_int_testing_repo: $(params.git_int_testing_repo)$
-        git_int_testing_repo_branch: $(params.git_int_testing_rev)$
-        skip_host_checking: $(params.git_repo_skip_host_checking)$
-        git_ssh_variant: ssh
-        app_domain: $(params.git_int_testing_url)$
   observedCompletion:
     failed:
       key: .status.conditions[?(@.type=="Ready")].status
+      #key: .status.pipeline-result
       value: "False"
     succeeded:
       key: .status.conditions[?(@.type=="Ready")].status
+      #key: .status.pipeline-result
       value: "True"
+  ytt: |
+    #@ load("@ytt:data", "data")
+    #@ def url():
+    #@   return data.values.deployment.url
+    #@ end
+    ---
+    apiVersion: carto.run/v1alpha1
+    kind: Runnable
+    metadata:
+      name: #@ data.values.workload.metadata.name + "-integration-test"
+    spec:
+        serviceAccountName: default
+        runTemplateRef:
+          name: integration-test
+        inputs:
+          url: #@ url()
+          git_int_testing_repo: #@ data.values.params.git_int_testing_repo
+          git_int_testing_repo_branch: #@ data.values.params.git_int_testing_rev
+          skip_host_checking: #@ data.values.params.git_repo_skip_host_checking
+          git_ssh_variant: ssh
+          app_domain: #@ data.values.params.git_int_testing_url
+
 ---
 apiVersion: carto.run/v1alpha1
 kind: ClusterRunTemplate
@@ -60,6 +69,8 @@ metadata:
   name: integration-test
 spec:
   serviceAccountName: #@ data.values.service_account_name
+  #outputs:
+  #  pipeline-result: status.conditions[?(@.type=="Succeeded")].status == "True"
   template:
     apiVersion: tekton.dev/v1beta1
     kind: TaskRun
@@ -90,9 +101,12 @@ spec:
                 value: "$(runnable.spec.inputs.git_ssh_variant)$"
               - name: CHECKOUT_DIR
                 value: "$(workspaces.source.path)"
+              - name: DELI_URL
+                value: "$(runnable.spec.inputs.url)$"
             script: |
               #!/usr/bin/env sh
               set -eux
+              echo ${DELI_URL}
 
               ##if [[ -n "${SKIP_HOST_CHECK}" && "${SKIP_HOST_CHECK}" = true ]]
               ##then
@@ -115,7 +129,6 @@ spec:
 
               cd "${CHECKOUT_DIR}"
               ls -al
-
           - name: integration-test
             ##gcr.io/cloud-builders/mvn@sha256:69fa58eaf83abbd7ed29cbbcbd3252dae28b029f8fdea1a5dbad98c517aeaf54
             image: harbor.h2o-4-2180.h2o.vmware.com/apps/mvn:latest
@@ -127,5 +140,6 @@ spec:
             args:
               - test
               - -Durl=$(PARAM_APP_DOMAIN)
+
 
 
