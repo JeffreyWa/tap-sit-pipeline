@@ -135,15 +135,15 @@ spec:
       resources: {}
       env:
         - name: PARAM_URL
-          value: "$(params.git_int_testing_repo)$"
+          value: "$(params.git_int_testing_repo)"
         - name: PRRAM_BRANCH
-          value: "$(params.git_int_testing_repo_branch)$"
+          value: "$(params.git_int_testing_repo_branch)"
         - name: GIT_SSH_VARIANT
-          value: "$(params.git_ssh_variant)$"
+          value: "$(params.git_ssh_variant)"
         - name: CHECKOUT_DIR
           value: "$(workspaces.source.path)"
         - name: DELI_URL
-          value: "$(params.url)$"
+          value: "$(params.url)"
       script: |
         #!/usr/bin/env sh
         set -eux
