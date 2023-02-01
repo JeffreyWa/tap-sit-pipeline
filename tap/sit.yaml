@@ -31,6 +31,8 @@ spec:
       default: ""
     - name: git_writer_ssh_variant
       default: ssh
+    - name: integration_testing_matching_labels
+      default: {}
   observedCompletion:
     failed:
       key: .status.conditions[?(@.type=="Ready")].status
@@ -51,17 +53,23 @@ spec:
     metadata:
       name: #@ data.values.workload.metadata.name + "-integration-test"
     spec:
-        serviceAccountName: default
-        runTemplateRef:
-          name: integration-test
-        inputs:
-          url: #@ url()
-          git_int_testing_repo: #@ data.values.params.git_int_testing_repo
-          git_int_testing_repo_branch: #@ data.values.params.git_int_testing_rev
-          skip_host_checking: #@ data.values.params.git_repo_skip_host_checking
-          git_ssh_variant: ssh
-          app_domain: #@ data.values.params.git_int_testing_url
-
+      serviceAccountName: default
+      runTemplateRef:
+        name: integration-test
+      inputs:
+        url: #@ url() or fail("no configuration url")
+        git_int_testing_repo: #@ data.values.params.git_int_testing_repo
+        git_int_testing_repo_branch: #@ data.values.params.git_int_testing_rev
+        skip_host_checking: #@ data.values.params.git_repo_skip_host_checking
+        git_ssh_variant: ssh
+        app_domain: #@ data.values.params.git_int_testing_url
+        integration_testing_matching_labels: #@ data.values.params.integration_testing_matching_labels
+      selector:
+        resource:
+          apiVersion: tekton.dev/v1beta1
+          kind: Task
+        #@ hasattr(data.values.params, "integration_testing_matching_labels") or fail("integration_testing_matching_labels param is required")
+        matchingLabels: #@ data.values.params["integration_testing_matching_labels"] or fail("integration_testing_matching_labels param cannot be empty")
 ---
 apiVersion: carto.run/v1alpha1
 kind: ClusterRunTemplate
@@ -71,75 +79,105 @@ spec:
   serviceAccountName: #@ data.values.service_account_name
   #outputs:
   #  pipeline-result: status.conditions[?(@.type=="Succeeded")].status == "True"
+
   template:
     apiVersion: tekton.dev/v1beta1
     kind: TaskRun
     metadata:
       generateName: $(runnable.metadata.name)$-
     spec:
+      params:
+        - name: url
+          value: $(runnable.spec.inputs.url)$
+        - name: git_int_testing_repo
+          value: $(runnable.spec.inputs.git_int_testing_repo)$
+        - name: git_int_testing_repo_branch
+          value: $(runnable.spec.inputs.git_int_testing_repo_branch)$
+        - name: skip_host_checking
+          value: $(runnable.spec.inputs.skip_host_checking)$
+        - name: git_ssh_variant
+          value: $(runnable.spec.inputs.git_ssh_variant)$
+        - name: app_domain
+          value: $(runnable.spec.inputs.app_domain)$
+        #- name: integration_testing_matching_labels
+        #  value: $(runnable.spec.inputs.integration_testing_matching_labels)$
+      taskRef:
+        name: $(selected.metadata.name)$
       workspaces:
         - name: source
           emptyDir: {}
         - name: ssh-directory
           secret:
             secretName: git-ssh-secret
-      taskSpec:
-        workspaces:
-          - name: source
-          - name: ssh-directory
-        steps:
-          - name: fetch-repo
-            ##'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
-            image: 'harbor.h2o-4-2180.h2o.vmware.com/apps/git-init:latest'
-            resources: {}
-            env:
-              - name: PARAM_URL
-                value: "$(runnable.spec.inputs.git_int_testing_repo)$"
-              - name: PRRAM_BRANCH
-                value: "$(runnable.spec.inputs.git_int_testing_repo_branch)$"
-              - name: GIT_SSH_VARIANT
-                value: "$(runnable.spec.inputs.git_ssh_variant)$"
-              - name: CHECKOUT_DIR
-                value: "$(workspaces.source.path)"
-              - name: DELI_URL
-                value: "$(runnable.spec.inputs.url)$"
-            script: |
-              #!/usr/bin/env sh
-              set -eux
-              echo ${DELI_URL}
+---
+apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: app-int-testing
+  namespace: workloads
+  labels:
+    apps.tanzu.vmware.com/pipeline: int-test
+spec:
+  params:
+    - name: url
+    - name: git_int_testing_repo
+    - name: git_int_testing_repo_branch
+    - name: skip_host_checking
+    - name: git_ssh_variant
+    - name: app_domain
+  workspaces:
+    - name: source
+    - name: ssh-directory
+  steps:
+    - name: fetch-repo
+      ##'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
+      image: 'harbor.h2o-4-2180.h2o.vmware.com/apps/git-init:latest'
+      resources: {}
+      env:
+        - name: PARAM_URL
+          value: "$(params.git_int_testing_repo)$"
+        - name: PRRAM_BRANCH
+          value: "$(params.git_int_testing_repo_branch)$"
+        - name: GIT_SSH_VARIANT
+          value: "$(params.git_ssh_variant)$"
+        - name: CHECKOUT_DIR
+          value: "$(workspaces.source.path)"
+        - name: DELI_URL
+          value: "$(params.url)$"
+      script: |
+        #!/usr/bin/env sh
+        set -eux
+        echo ${DELI_URL}
 
-              ##if [[ -n "${SKIP_HOST_CHECK}" && "${SKIP_HOST_CHECK}" = true ]]
-              ##then
-              ##  export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-              ##fi
-              ##if [[ -n "${GIT_SSH_VARIANT}" ]]
-              ##then
-              ##  export GIT_SSH_VARIANT="${GIT_SSH_VARIANT}"
-              ##fi
+        ##if [[ -n "${SKIP_HOST_CHECK}" && "${SKIP_HOST_CHECK}" = true ]]
+        ##then
+        ##  export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+        ##fi
+        ##if [[ -n "${GIT_SSH_VARIANT}" ]]
+        ##then
+        ##  export GIT_SSH_VARIANT="${GIT_SSH_VARIANT}"
+        ##fi
 
-              echo ${PARAM_URL}
-              echo ${PRRAM_BRANCH}
-              echo ${CHECKOUT_DIR}
-              export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-              echo ${GIT_SSH_COMMAND}
-              /ko-app/git-init \
-              -url="${PARAM_URL}" \
-              -revision="${PRRAM_BRANCH}" \
-              -path="${CHECKOUT_DIR}"
+        echo ${PARAM_URL}
+        echo ${PRRAM_BRANCH}
+        echo ${CHECKOUT_DIR}
+        export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+        echo ${GIT_SSH_COMMAND}
+        /ko-app/git-init \
+        -url="${PARAM_URL}" \
+        -revision="${PRRAM_BRANCH}" \
+        -path="${CHECKOUT_DIR}"
 
-              cd "${CHECKOUT_DIR}"
-              ls -al
-          - name: integration-test
-            ##gcr.io/cloud-builders/mvn@sha256:69fa58eaf83abbd7ed29cbbcbd3252dae28b029f8fdea1a5dbad98c517aeaf54
-            image: harbor.h2o-4-2180.h2o.vmware.com/apps/mvn:latest
-            env:
-              - name: PARAM_APP_DOMAIN
-                value: "$(runnable.spec.inputs.app_domain)$"
-            workingDir: $(workspaces.source.path)
-            command: ["/usr/bin/mvn"]
-            args:
-              - test
-              - -Durl=$(PARAM_APP_DOMAIN)
-
-
-
+        cd "${CHECKOUT_DIR}"
+        ls -al
+    - name: integration-test
+      ##gcr.io/cloud-builders/mvn@sha256:69fa58eaf83abbd7ed29cbbcbd3252dae28b029f8fdea1a5dbad98c517aeaf54
+      image: harbor.h2o-4-2180.h2o.vmware.com/apps/mvn:latest
+      env:
+        - name: PARAM_APP_DOMAIN
+          value: "$(runnable.spec.inputs.app_domain)$"
+      workingDir: $(workspaces.source.path)
+      command: ["/usr/bin/mvn"]
+      args:
+        - test
+        - -Durl=$(PARAM_APP_DOMAIN)

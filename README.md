@@ -13,12 +13,12 @@ name: #@ data.values.workload.metadata.name
       params:
         - name: "gitops_ssh_secret"
           value: #@ param("gitops_ssh_secret")
-        - name: #@ data.values.workload.spec.params[0].name
-          value: #@ data.values.workload.spec.params[0].value
-        - name: #@ data.values.workload.spec.params[1].name
-          value: #@ data.values.workload.spec.params[1].value
-        - name: #@ data.values.workload.spec.params[2].name
-          value: #@ data.values.workload.spec.params[2].value
+        #@ if hasattr(data.values.workload.spec, "params"):
+        #@ for i in range(len(data.values.workload.spec.params)):
+        - name: #@ data.values.workload.spec.params[i].name
+          value: #@ data.values.workload.spec.params[i].value
+        #@ end
+        #@ end
 ```
 
 # Add an integration operation after successful deployment
@@ -55,7 +55,8 @@ tanzu apps workload update tanzu-java-web-app \
 --sub-path tanzu-java-web-app \
 --param "git_int_testing_repo=ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/tanzu-java-web-app.git" \
 --param "git_int_testing_rev=main" \
---param "git_int_testing_url=http://tanzu-java-web-app.workloads.apps.tap.h2o-4-2180.h2o.vmware.com/"
+--param "git_int_testing_url=http://tanzu-java-web-app.workloads.apps.tap.h2o-4-2180.h2o.vmware.com/" \
+--param-yaml integration_testing_matching_labels='{"apps.tanzu.vmware.com/pipeline":"int-test"}'
 
 ``````
 
