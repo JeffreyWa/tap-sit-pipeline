@@ -52,6 +52,7 @@ tanzu apps workload update tanzu-java-web-app \
 --label app.kubernetes.io/part-of=tanzu-java-web-app \
 --yes \
 --namespace workloads \
+--param "actest-namespace=acctest" 
 --sub-path tanzu-java-web-app \
 --param "git_int_testing_repo=ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/tanzu-java-web-app.git" \
 --param "git_int_testing_rev=main" \

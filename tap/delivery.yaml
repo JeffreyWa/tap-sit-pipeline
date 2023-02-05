@@ -1,0 +1,68 @@
+apiVersion: carto.run/v1alpha1
+kind: ClusterDelivery
+metadata:
+  annotations:
+    kapp.k14s.io/identity: v1;/carto.run/ClusterDelivery/delivery-basic;carto.run/v1alpha1
+    kapp.k14s.io/original: '{"apiVersion":"carto.run/v1alpha1","kind":"ClusterDelivery","metadata":{"labels":{"kapp.k14s.io/app":"1669392941727955921","kapp.k14s.io/association":"v1.4366874b0796d3d98c4fb91b241ff72f"},"name":"delivery-basic"},"spec":{"resources":[{"name":"source-provider","params":[{"name":"serviceAccount","value":"default"},{"name":"gitImplementation","value":"go-git"}],"templateRef":{"kind":"ClusterSourceTemplate","name":"delivery-source-template"}},{"deployment":{"resource":"source-provider"},"name":"deployer","params":[{"name":"serviceAccount","value":"default"}],"templateRef":{"kind":"ClusterDeploymentTemplate","name":"app-deploy"}}],"selector":{"app.tanzu.vmware.com/deliverable-type":"web"}}}'
+    kapp.k14s.io/original-diff-md5: c6e94dc94aed3401b5d0f26ed6c0bff3
+  creationTimestamp: "2022-11-25T16:15:41Z"
+  generation: 1
+  labels:
+    kapp.k14s.io/app: "1669392941727955921"
+    kapp.k14s.io/association: v1.4366874b0796d3d98c4fb91b241ff72f
+  name: delivery-basic
+  resourceVersion: "9522074"
+  uid: aff4ebef-e3e5-4c9a-9a20-d432dd0ce75d
+spec:
+  resources:
+  - name: source-provider
+    params:
+    - name: serviceAccount
+      value: default
+    - name: gitImplementation
+      value: go-git
+    templateRef:
+      kind: ClusterSourceTemplate
+      name: delivery-source-template
+  - deployment:
+      resource: source-provider
+    name: deployer
+    params:
+    - name: serviceAccount
+      value: default
+    templateRef:
+      kind: ClusterDeploymentTemplate
+      name: app-deploy
+  - deployment:
+      resource: deployer
+    name: integration-testing
+    params:
+    - name: serviceAccount
+      value: default
+    templateRef:
+      kind: ClusterDeploymentTemplate
+      name: integration-test 
+  - name: sit-deployment
+    deployment:
+      resource: integration-testing
+    params:
+    - name: serviceAccount
+      value: default
+    templateRef:
+      kind: ClusterDeploymentTemplate
+      name: deploy-sit
+  selector:
+    app.tanzu.vmware.com/deliverable-type: web
+status:
+  conditions:
+  - lastTransitionTime: "2022-11-29T03:17:55Z"
+    message: ""
+    reason: Ready
+    status: "True"
+    type: TemplatesReady
+  - lastTransitionTime: "2022-11-29T03:17:55Z"
+    message: ""
+    reason: Ready
+    status: "True"
+    type: Ready
+  observedGeneration: 1
