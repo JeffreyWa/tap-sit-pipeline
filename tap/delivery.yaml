@@ -51,6 +51,16 @@ spec:
     templateRef:
       kind: ClusterDeploymentTemplate
       name: deploy-sit
+  #- deployment:
+  #    resource: sit-deployment
+  #  name: sit-app
+  #  params:
+  #  - name: serviceAccount
+  #    value: default
+  #  templateRef:
+  #    kind: ClusterDeploymentTemplate
+  #    name: sit-app
+
   selector:
     app.tanzu.vmware.com/deliverable-type: web
 status:

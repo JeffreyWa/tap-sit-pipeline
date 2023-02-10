@@ -1,0 +1,19 @@
+apiVersion: carto.run/v1alpha1
+kind: Deliverable
+metadata:
+  name: fcb-web
+  namespace: acctest
+  labels:
+    app.tanzu.vmware.com/deliverable-type: web
+    app.tanzu.vmware.com/deliverable-target: acceptance
+spec:
+  serviceAccountName: default
+  params:
+    - name: "gitops_ssh_secret"
+      value: git-ssh-secret-1
+  source:
+    git:
+      url: ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/fcb-web-gitops.git
+      ref:
+        branch: act
+    subPath: config

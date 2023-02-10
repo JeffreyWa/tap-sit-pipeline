@@ -113,38 +113,6 @@ spec:
         sit_sub_path: #@ "config/" + param("actest-namespace") + "/" + data.values.workload.metadata.name
         sit_namespace: #@ param("actest-namespace")         
         #@ end
-    ---
-    apiVersion: kappctrl.k14s.io/v1alpha1
-    kind: App
-    metadata:
-      name: #@ data.values.workload.metadata.name
-      namespace: #@ param("actest-namespace")
-    spec:
-      fetch:
-      - git:
-          url: #@ data.values.workload.spec.source.git.url
-          ref: #@ data.values.workload.spec.source.git.ref
-          subpath: #@ "config/" + param("actest-namespace") + "/" + data.values.workload.metadata.name
-          #! subpath: config/acc-test/fcb-web
-      syncPeriod: 1m0s
-      #! ###keep it here for future multi-cluster deployment
-      #! cluster:
-      #!  # specifies namespace in destination cluster (optional)
-      #!  namespace: default
-      #!  # specifies secret containing kubeconfig (required)
-      #!  kubeconfigSecretRef:
-      #!    # specifies secret name within app's namespace (required)
-      #!    name: kubeconfig-deliverable-reconciler-secret
-      #!    # specifies key that contains kubeconfig (optional)
-      #!    key: value
-      deploy:
-      - kapp:
-          rawOptions: ["--dangerous-allow-empty-list-of-resources=true"]
-      template:
-      - ytt: {}
-      - kbld: {}
-
-
 ---
 apiVersion: carto.run/v1alpha1
 kind: ClusterRunTemplate
@@ -221,7 +189,9 @@ spec:
               export GIT_SSH_COMMAND="ssh -F $ssh_config_file"
 
               cd `mktemp -d`
+              mkdir manifest
 
+             
               if git clone --depth 1 -b "$(params.git_branch)" "$(params.git_repository)" ./repo; then
                 cd ./repo
               else
@@ -230,22 +200,30 @@ spec:
                 git checkout -b "$(params.git_branch)"
               fi
 
+              cp -r * ../manifest/
+              git checkout -b act
+              git pull origin act --rebase
+              cp -r ../manifest/* .
+              
+
               git config user.email "$(params.git_user_email)"
               git config user.name "$(params.git_user_name)"
 
-              if [ -d "$(params.sit_sub_path)" ]; then
-                echo "Directory exists, update"
-                diff -q $(params.sit_sub_path)/delivery.yml $(params.sub_path)/delivery.yml
-                if [ $? == 0 ]; then
-                  exit 0
-                fi  
-              else
-                echo "Create sit config direcotry"
-                mkdir -p $(params.sit_sub_path) && rm -rf $(params.sit_sub_path)/*
-              fi
-              cp $(params.sub_path)/* $(params.sit_sub_path)
+              #if [ -d "$(params.sit_sub_path)" ]; then
+              #  echo "Directory exists, update"
+              #  diff -q $(params.sit_sub_path)/delivery.yml $(params.sub_path)/delivery.yml
+              #  if [ $? == 0 ]; then
+              #    exit 0
+              #  fi  
+              #else
+              #  echo "Create sit config direcotry"
+              #  mkdir -p $(params.sit_sub_path) && rm -rf $(params.sit_sub_path)/*
+              #fi
+              #cp $(params.sub_path)/* $(params.sit_sub_path)
 
-              git add $(params.sit_sub_path)/*
+              #git add $(params.sit_sub_path)/*
 
+              git add . 
               git commit -m "$(params.git_commit_message)" --allow-empty
-              git push origin $(params.git_branch)
+             
+              git push -f origin act
