@@ -1,14 +1,13 @@
-
-	![Concept](img/diagram.png)
+![Concept](/img/diagram.jpg "Concept")
 
 # Dismiss monorepo and use individual gitops repo for each app
 
 1. Add gitops_repository parameter in workload.
 2. The default branch for acceptance deployment is "act"
 3. Remove parameters related to monorepo from from supplychain installation
-   --gitops_repository_name
-   --gitops_server_address
-   --gitops_repository_owner
+   #### --gitops_repository_name 
+   #### --gitops_server_address 
+   #### --gitops_repository_owner 
 
 # Create an acceptance clusterdelivery 
 ```
