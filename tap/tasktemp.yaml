@@ -139,7 +139,8 @@ spec:
   steps:
     - name: fetch-repo
       ##'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
-      image: 'harbor.h2o-4-2180.h2o.vmware.com/apps/git-init:latest'
+      ## image: 'harbor.h2o-4-2180.h2o.vmware.com/apps/git-init:latest'
+      image: 'harbor.h2o-4-2180.h2o.vmware.com/tap-install/tap-packages@sha256:b97474e8b8504f3602150e60d868890332585f3304cfd55d5f007a5ea5feb37a'
       resources: {}
       env:
         - name: PARAM_URL
@@ -155,7 +156,6 @@ spec:
       script: |
         #!/usr/bin/env sh
         set -eux
-
         ##if [[ -n "${SKIP_HOST_CHECK}" && "${SKIP_HOST_CHECK}" = true ]]
         ##then
         ##  export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
@@ -168,12 +168,21 @@ spec:
         echo ${DELI_IMAGE}
         echo ${PRRAM_BRANCH}
         echo ${CHECKOUT_DIR}
-        export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+        ssh_config_file=$(mktemp)
+
+        echo "
+        UserKnownHostsFile /tekton/creds/.ssh/known_hosts
+        Include $(credentials.path)/.ssh/config
+        " > $ssh_config_file
+        export GIT_SSH_COMMAND="ssh -F $ssh_config_file"
+
+        # export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
         echo ${GIT_SSH_COMMAND}
-        /ko-app/git-init \
-        -url="${PARAM_URL}" \
-        -revision="${PRRAM_BRANCH}" \
-        -path="${CHECKOUT_DIR}"
+        #/ko-app/git-init \
+        #-url="${PARAM_URL}" \
+        #-revision="${PRRAM_BRANCH}" \
+        #-path="${CHECKOUT_DIR}"
+        git clone --depth 1 -b "${PRRAM_BRANCH}" "${PARAM_URL}" "${CHECKOUT_DIR}" 
 
         cd "${CHECKOUT_DIR}"
         ls -al
