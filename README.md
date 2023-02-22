@@ -9,6 +9,10 @@
    #### --gitops_server_address 
    #### --gitops_repository_owner 
 
+
+# Create a clusterrolebinding for serviceaccount
+kubectl create clusterrolebinding fcb-cluster-pipeline --clusterrole=tekton-pipelines-app-operator-cluster-access --serviceaccount=[ns]]:default
+
 # Create an acceptance clusterdelivery 
 ```
     kubeclt apply -f tap/clusterdelivery-sit.yaml
