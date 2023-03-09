@@ -83,14 +83,15 @@ tanzu apps workload create fcb-python \
           - name: JAVA_TOOL_OPTIONS
             value: -Dserver.port="8088"
       ```
-   2. Add ports paramaters to workload for service ports 
+   2. Add ports paramaters to workload for service ports.
 
 ### Add health proble
-    Follow [this link](https://docs.vmware.com/en/VMware-Tanzu-Application-Platform/1.4/tap/spring-boot-conventions-reference-CONVENTIONS.html). 
+  For spring boot application, following [this link](https://docs.vmware.com/en/VMware-Tanzu-Application-Platform/1.4/tap/spring-boot-conventions-reference-CONVENTIONS.html). 
 
 ### Add ingress.
-    You should bring your own ingress as a parameter for workload.
-    This demo uses contour HTTPProxy as an exmaple
+  You should bring your own ingress as a parameter for workload.
+  This demo uses contour HTTPProxy as an exmaple:
+
     ```
     apiVersion: projectcontour.io/v1
     kind: HTTPProxy
