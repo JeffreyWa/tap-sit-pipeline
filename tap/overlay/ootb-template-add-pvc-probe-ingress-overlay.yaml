@@ -209,5 +209,8 @@ stringData:
           name: #@ data.values.workload.metadata.name + "-server"
           labels: #@ merge_labels({ "app.kubernetes.io/component": "config" })
         data:
-          #! delivery.yml: #@ yaml.encode(delivery())
+          #@ if param("ingress"):
           delivery.yml: #@ yaml.encode(delivery()) + "\n---\n" + yaml.encode(param("ingress"))
+          #@ else:
+          delivery.yml: #@ yaml.encode(delivery())
+          #@ end
