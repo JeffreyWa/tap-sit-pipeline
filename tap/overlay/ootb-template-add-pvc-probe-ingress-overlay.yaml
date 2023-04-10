@@ -107,6 +107,8 @@ stringData:
                   volumeMounts: #@ param("volumeMounts")
               #@ if/end param("volumes"):
               volumes: #@ param("volumes")
+              #@ if/end param("terminationGracePeriodSeconds"):
+              terminationGracePeriodSeconds: #@ param("volumes")
 
     #@ def server_template():
     kind: ClusterConfigTemplate
