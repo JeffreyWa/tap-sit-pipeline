@@ -1,0 +1,67 @@
+#@ load("@ytt:data", "data")
+
+#@ def buildParams():
+#@ if True:
+  - name: annotations
+    value:
+      autoscaling.knative.dev/minScale: "2"
+#@ end      
+#@ if data.values.enableLivenessProbe == True:
+  - name: livenessProbe
+    value:    
+#@ if data.values.probeMethod == "http":
+      httpGet:
+        path: #@ data.values.livenessPath
+        port: #@ data.values.livenessPort
+#@ elif data.values.probeMethod == "tcp":
+      tcpSocket:
+        port: #@ data.values.livenessPort
+#@ elif data.values.probeMethod == "grpc":
+      gRPC:
+        port: #@ data.values.livenessPort
+#@ end
+      initialDelaySeconds: #@ data.values.initialDelaySeconds
+      periodSeconds: #@ data.values.periodSeconds  
+#@ end
+
+#@ if data.values.enableCustomVolume == True:
+  - name: volumes
+  - value: 
+#@ for vol in data.values.volumes:
+    - name: #@ vol.volName
+#@ if vol.volType == "secret":
+      secret:
+        secretName: #@ vol.volId
+#@ elif vol.volType == "configmap":
+      configMap:
+        name: #@ vol.volId
+#@ else:
+      persistentVolumeClaim:
+        claimName: #@ vol.volId         
+#@ end            
+#@ end
+  - name: volumeMounts
+  - value: 
+#@ for vol in data.values.volumes:
+    - name: #@ vol.volName
+      mountPath: #@ vol.mountPath
+#@ end
+#@ end
+#@ end
+
+---
+apiVersion: carto.run/v1alpha1
+kind: Workload
+metadata:
+  name: tanzu-java-web-app
+  labels:
+    apps.tanzu.vmware.com/workload-type: web
+    app.kubernetes.io/part-of: tanzu-java-web-app
+spec:
+  params: #@ buildParams()
+  source:
+    git:
+      ref:
+        branch: main
+      url: https://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/tanzu-java-web-app
+    

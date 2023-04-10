@@ -1,0 +1,59 @@
+accelerator:
+  types:
+    - name: Volume
+      struct:
+        - name: volName
+          description: "Specify a name for the volume"
+          label: Volume Name
+          inputType: text
+          default: vol
+          dataType: string
+          required: true         
+        - name: volType
+          description: "Volume type: support secret, configmap and pvc now"
+          label: Volume type
+          inputType: select
+          default: pvc
+          choices:
+          - value: secret
+            text: secret
+          - value: configmap
+            text: configmap
+          - value: pvc
+            text: pvc
+          required: true
+        - name: volId
+          description: "Name of secret, configmap or pvc"
+          label: Entity name
+          inputType: text
+          default: secret
+          dataType: string
+          required: true
+        - name: mountPath
+          description: "Mount path in Pod"
+          label: Mount Path
+          inputType: text
+          default: /mnt
+          dataType: string
+          required: true          
+
+  options:
+  - name: enableCustomVolume
+    description: "If set to true, we can add volume to POD."
+    defaultValue: false
+    label: Enable Custom Volume
+    inputType: checkbox
+    dataType: boolean
+    required: true
+  - name: volumes
+    dataType: [Volume]
+    dependsOn: 
+      name: enableCustomVolume
+      value: true
+
+engine:
+  merge:
+    # workload.yaml
+    - include: [ "config/workload.yaml" ]
+      chain:
+      - type: YTT

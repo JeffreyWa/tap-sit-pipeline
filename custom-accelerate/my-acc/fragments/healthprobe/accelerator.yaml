@@ -1,0 +1,72 @@
+accelerator:
+  options:
+  - name: enableLivenessProbe
+    description: "If set to true, liveness probe will be added to pod manifest."
+    defaultValue: false
+    label: Enable Liveness Probe
+    inputType: checkbox
+    dataType: boolean
+    required: true
+  - label: Chose Probe Method
+    description: "Probe method."
+    inputType: select
+    defaultValue: httpGet
+    name: probeMethod
+    choices:
+    - value: http
+      text: httpGet
+    - value: tcp
+      text: tcpSocket
+    - value: grpc
+      text: gRPC
+    required: true
+    dependsOn: 
+      name: enableLivenessProbe
+      value: true
+  - label: Path
+    description: "Health endpoint url"
+    inputType: text
+    dataType: string
+    defaultValue: /healthz
+    name: livenessPath
+    required: true
+    dependsOn: 
+      name: probeMethod
+      value: http
+  - label: Port
+    description: "Health endpoint port"
+    inputType: text
+    dataType: number
+    defaultValue: 8080
+    name: livenessPort
+    required: true
+    dependsOn: 
+      name: enableLivenessProbe
+      value: true
+  - label: InitialDelaySeconds
+    description: "Number of seconds after the container has started before startup, liveness or readiness probes are initiated."
+    inputType: text
+    dataType: number
+    defaultValue: 5
+    name: initialDelaySeconds
+    required: true
+    dependsOn: 
+      name: enableLivenessProbe
+      value: true
+  - label: PeriodSeconds
+    description: "How often (in seconds) to perform the probe."
+    inputType: text
+    dataType: number
+    defaultValue: 1
+    name: periodSeconds
+    required: true
+    dependsOn: 
+      name: enableLivenessProbe
+      value: true
+
+engine:
+  merge:
+    # workload.yaml
+    - include: [ "config/workload.yaml" ]
+      chain:
+      - type: YTT
