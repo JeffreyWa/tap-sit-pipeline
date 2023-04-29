@@ -1,0 +1,27 @@
+apiVersion: carto.run/v1alpha1
+kind: Workload
+metadata:
+  name: spring-sensors-sensor
+  labels:
+    apps.tanzu.vmware.com/workload-type: web
+spec:
+  params:
+  - name: annotations
+    value:
+      autoscaling.knative.dev/minScale: "1"  
+  - name: gitops_sub_path
+    value: config
+  - name: gitops_repository
+    value: ssh://git@gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/service-binding-consumer-gitops.git
+  source:
+    git:
+      url: ssh://gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/service-binding-app.git
+      ref:
+        branch: main
+    subPath: spring-sensors-producer  
+  serviceClaims:
+    - name: rmq
+      ref:
+        apiVersion: services.apps.tanzu.vmware.com/v1alpha1
+        kind: ClassClaim
+        name: bigcorp-rmq-1

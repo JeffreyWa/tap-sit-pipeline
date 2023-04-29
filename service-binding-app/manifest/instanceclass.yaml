@@ -1,0 +1,13 @@
+# bigcorp-rabbitmq.class.yml
+
+---
+apiVersion: services.apps.tanzu.vmware.com/v1alpha1
+kind: ClusterInstanceClass
+metadata:
+  name: bigcorp-rabbitmq
+spec:
+  description:
+    short: On-demand RabbitMQ clusters precision engineered to meet the needs of BigCorp!
+  provisioner:
+    crossplane:
+      compositeResourceDefinition: xrabbitmqclusters.messaging.bigcorp.org

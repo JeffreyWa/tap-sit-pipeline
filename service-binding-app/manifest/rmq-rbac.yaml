@@ -1,0 +1,16 @@
+# provider-kubernetes-rmqcluster-read-writer.rbac.yml
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rmqcluster-read-writer
+  labels:
+    services.tanzu.vmware.com/aggregate-to-provider-kubernetes: "true"
+rules:
+- apiGroups:
+  - rabbitmq.com
+  resources:
+  - rabbitmqclusters
+  verbs:
+  - "*"

@@ -1,0 +1,14 @@
+# bigcorp-rmq-1.claim.yml
+
+---
+apiVersion: services.apps.tanzu.vmware.com/v1alpha1
+kind: ClassClaim
+metadata:
+  name: bigcorp-rmq-1
+  namespace: workloads
+spec:
+  classRef:
+    name: bigcorp-rabbitmq
+  parameters:
+    storageGB: 1
+    replicas: 1
