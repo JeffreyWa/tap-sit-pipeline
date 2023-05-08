@@ -18,23 +18,23 @@
 apiVersion: carto.run/v1alpha1
 kind: ClusterDeploymentTemplate
 metadata:
-  name: deploy-sit
+  name: deploy-act
 spec:
   params:
+    - name: serviceAccount
+      default: default
     - name: git_repo_skip_host_checking
       default: true
     - name: git_writer_ssh_variant
       default: ssh
     - name: gitops_user_name
-      default: Jeffrey
+      default: vmware_taiwan_pso
     - name: gitops_user_email
-      default: jeff@vmw.com
+      default: vmware_taiwan_pso@vmware.com
     - name: actest-namespace
       default: ""
     - name: git_commit_message
-      default: "sit deploy"
-    - name: actest-namespace
-      default: ""
+      default: "act deploy"
     - name: image
       default: ""
   observedCompletion:
@@ -93,17 +93,19 @@ spec:
     apiVersion: carto.run/v1alpha1
     kind: Runnable 
     metadata:
-      name: #@ data.values.workload.metadata.name + "-deploy-sit"
-      #! ## labels: #@ merge_labels({ "app.kubernetes.io/component": "deploy-sit" })
+      name: #@ data.values.workload.metadata.name + "-deploy-act"
+      #! ## labels: #@ merge_labels({ "app.kubernetes.io/component": "deploy-act" })
     spec:
-      serviceAccountName: default
+      #@ if/end hasattr(data.values.workload.spec, "serviceAccountName"):
+      serviceAccountName: #@ data.values.workload.spec.serviceAccountName
       runTemplateRef:
-        name: deploy-sit
+        name: deploy-act
       inputs:
         #! sit_testing: #@ data.values
         #@ if is_gitops():
         url: #@ url()
         #! image: #@ param("image")
+        serviceAccount: #@ data.values.params.serviceAccount
         git_repository: #@ git_repository()
         git_branch: #@ git_repository_branch()
         git_user_name:  #@ param("gitops_user_name")
@@ -111,21 +113,24 @@ spec:
         git_commit_message: #@ param("gitops_commit_message")
         sub_path: #@ "config/" + data.values.workload.metadata.namespace + "/" + data.values.workload.metadata.name
         sit_sub_path: #@ "config/" + param("actest-namespace") + "/" + data.values.workload.metadata.name
-        sit_namespace: #@ param("actest-namespace")         
+        next_namespace: #@ param("actest-namespace")
+        namespace: #@ data.values.workload.metadata.namespace
+        workloadname: #@ data.values.workload.metadata.name
+        gitops_ssh_secret: #@ param("gitops_ssh_secret")
         #@ end
 ---
 apiVersion: carto.run/v1alpha1
 kind: ClusterRunTemplate
 metadata:
-  name: deploy-sit
+  name: deploy-act
 spec:
-  #serviceAccountName: default
   template:
     apiVersion: tekton.dev/v1beta1
     kind: TaskRun
     metadata:
       generateName: $(runnable.metadata.name)$-
     spec:
+      serviceAccountName: $(runnable.spec.inputs.serviceAccount)$
       params:
       - name: git_repository
         value: $(runnable.spec.inputs.git_repository)$
@@ -143,12 +148,18 @@ spec:
         value: $(runnable.spec.inputs.sit_sub_path)$
       - name: url
         value: $(runnable.spec.inputs.url)$
+      - name: namespace
+        value: $(runnable.spec.inputs.namespace)$
+      - name: next_namespace
+        value: $(runnable.spec.inputs.next_namespace)$
+      - name: workloadname
+        value: $(runnable.spec.inputs.workloadname)$
       workspaces:
         - name: source
           emptyDir: {}
         - name: ssh-directory
           secret:
-            secretName: git-ssh-secret
+            secretName: $(runnable.spec.inputs.gitops_ssh_secret)$
       taskSpec:
         workspaces:
           - name: source
@@ -156,28 +167,24 @@ spec:
         params:
           - name: git_repository 
           - name: git_branch 
-          - name: git_user_email 
+          - name: git_user_email
           - name: git_user_name 
           - name: git_commit_message 
           - name: sub_path
           - name: sit_sub_path 
           - name: url
+          - name: namespace
+          - name: workloadname
         steps:
-          - name: update-sit-image
-            ##'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
-            image: 'harbor.h2o-4-2180.h2o.vmware.com/tap-install/tap-packages@sha256:b97474e8b8504f3602150e60d868890332585f3304cfd55d5f007a5ea5feb37a'
+          - name: update-act-image
+            # image: 'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
+            image: harbor.lab.tw/tap/tap-packages-14@sha256:72dddaea72f572810d325aa6754da040d5d00e246f11cfdd1a7bcefdca071e43
             resources: {}
             script: |
               #!/usr/bin/env bash
-
-              ## set -o errexit
+              echo "$(params.url)"
+              set -o errexit
               set -o xtrace
-
-              echo $(params.url)
-              echo $(credentials.path)
-              echo $(params.git_repository)
-              echo $(params.sit_sub_path)
-              
 
               ssh_config_file=$(mktemp)
 
@@ -189,41 +196,27 @@ spec:
               export GIT_SSH_COMMAND="ssh -F $ssh_config_file"
 
               cd `mktemp -d`
-              mkdir manifest
 
-             
-              if git clone --depth 1 -b "$(params.git_branch)" "$(params.git_repository)" ./repo; then
+              if git clone --depth 1 -b "dev" "$(params.git_repository)" ./repo; then
                 cd ./repo
               else
                 git clone --depth 1 "$(params.git_repository)" ./repo
                 cd ./repo
-                git checkout -b "$(params.git_branch)"
+                git checkout -b "dev"
               fi
-
-              cp -r * ../manifest/
-              git checkout -b act
-              git pull origin act --rebase
-              cp -r ../manifest/* .
               
-
               git config user.email "$(params.git_user_email)"
               git config user.name "$(params.git_user_name)"
+              
+              mkdir -p ./config/$(params.next_namespace)/$(params.workloadname)
+              cp ./config/$(params.namespace)/$(params.workloadname)/delivery.yml ./config/$(params.next_namespace)/$(params.workloadname)/delivery.yml
+              # sed -i 's/harbor\.lab\.tw/harbor\.prod\.tw/g' ./config/$(params.next_namespace)/$(params.workloadname)/delivery.yml
+              cat ./config/$(params.next_namespace)/$(params.workloadname)/delivery.yml
 
-              #if [ -d "$(params.sit_sub_path)" ]; then
-              #  echo "Directory exists, update"
-              #  diff -q $(params.sit_sub_path)/delivery.yml $(params.sub_path)/delivery.yml
-              #  if [ $? == 0 ]; then
-              #    exit 0
-              #  fi  
-              #else
-              #  echo "Create sit config direcotry"
-              #  mkdir -p $(params.sit_sub_path) && rm -rf $(params.sit_sub_path)/*
-              #fi
-              #cp $(params.sub_path)/* $(params.sit_sub_path)
+              git add ./config/$(params.next_namespace)/$(params.workloadname)/delivery.yml
 
-              #git add $(params.sit_sub_path)/*
-
-              git add . 
-              git commit -m "$(params.git_commit_message)" --allow-empty
-             
-              git push -f origin act
+              git commit -m "update delivery.yml for accetance namespace" --allow-empty
+              git checkout -b "act"
+              
+              git merge dev
+              git push origin act --force

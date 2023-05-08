@@ -21,20 +21,9 @@ metadata:
   name: integration-test
 spec:
   params:
-    - name: git_int_testing_repo
-      default: ""
-    - name: git_int_testing_rev
-      default: ""
-    - name: git_repo_skip_host_checking
-      default: true
-    - name: git_int_testing_url
-      default: ""
-    - name: git_writer_ssh_variant
-      default: ssh
     - name: integration_testing_matching_labels
-      default: {}
-    - name: image
-      default: ""
+      default: 
+        apps.tanzu.vmware.com/pipeline: int-test
   observedCompletion:
     failed:
       key: .status.conditions[?(@.type=="Ready")].status
@@ -49,151 +38,67 @@ spec:
     #@ def url():
     #@   return data.values.deployment.url
     #@ end
+
+    #@ def merge_labels(fixed_values):
+    #@   labels = {}
+    #@   if hasattr(data.values.workload.metadata, "labels"):
+    #@     labels.update(data.values.workload.metadata.labels)
+    #@   end
+    #@   labels.update(fixed_values)
+    #@   return labels
+    #@ end
+
+    #@ def merged_tekton_params():
+    #@   params = []
+    #@   if hasattr(data.values, "params") and hasattr(data.values.params, "integration-testing_pipeline_params"):
+    #@     for param in data.values.params["integration-testing_pipeline_params"]:
+    #@       params.append({ "name": param, "value": data.values.params["integration-testing_pipeline_params"][param] })
+    #@     end
+    #@   end
+    #@   params.append({ "name": "url", "value": url() })
+    #@   return params
+    #@ end    
     ---
     apiVersion: carto.run/v1alpha1
     kind: Runnable
     metadata:
       name: #@ data.values.workload.metadata.name + "-integration-test"
+      labels: #@ merge_labels({ "app.kubernetes.io/component": "test" })
     spec:
-      serviceAccountName: default
+      #@ if/end hasattr(data.values.workload.spec, "serviceAccountName"):
+      serviceAccountName: #@ data.values.workload.spec.serviceAccountName
+      
       runTemplateRef:
-        name: integration-test
-      inputs:
-        url: #@ url() or fail("no configuration url")
-        image: #@ data.values.params.image or fail("no configuration image")
-        git_int_testing_repo: #@ data.values.params.git_int_testing_repo
-        git_int_testing_repo_branch: #@ data.values.params.git_int_testing_rev
-        skip_host_checking: #@ data.values.params.git_repo_skip_host_checking
-        git_ssh_variant: ssh
-        app_domain: #@ data.values.params.git_int_testing_url
-        integration_testing_matching_labels: #@ data.values.params.integration_testing_matching_labels
-        namespace: #@ data.values.workload.metadata.namespace
-        #! testing:  #@ data.values.params.image
+        name: tekton-deployment-pipelinerun
+        kind: ClusterRunTemplate
+
       selector:
         resource:
           apiVersion: tekton.dev/v1beta1
-          kind: ClusterTask
+          kind: Pipeline
+
         #@ hasattr(data.values.params, "integration_testing_matching_labels") or fail("integration_testing_matching_labels param is required")
-        matchingLabels: #@ data.values.params["integration_testing_matching_labels"] or fail("integration_testing_matching_labels param cannot be empty")      
+        matchingLabels: #@ data.values.params["integration_testing_matching_labels"] or fail("integration_testing_matching_labels param cannot be empty")
+
+      inputs:
+        url: #@ url() or fail("no configuration url")
+        tekton-params: #@ merged_tekton_params()
+
 ---
 apiVersion: carto.run/v1alpha1
 kind: ClusterRunTemplate
 metadata:
-  name: integration-test
+  name: tekton-deployment-pipelinerun
 spec:
-  serviceAccountName: #@ data.values.service_account_name
-  #outputs:
-  #  pipeline-result: status.conditions[?(@.type=="Succeeded")].status == "True"
-
+  outputs:
+    url: spec.params[?(@.name=="url")].value
   template:
     apiVersion: tekton.dev/v1beta1
-    kind: TaskRun
+    kind: PipelineRun
     metadata:
       generateName: $(runnable.metadata.name)$-
+      labels: $(runnable.metadata.labels)$
     spec:
-      params:
-        - name: url
-          value: $(runnable.spec.inputs.url)$
-        - name: namespace
-          value: $(runnable.spec.inputs.namespace)$
-        - name: git_int_testing_repo
-          value: $(runnable.spec.inputs.git_int_testing_repo)$
-        - name: git_int_testing_repo_branch
-          value: $(runnable.spec.inputs.git_int_testing_repo_branch)$
-        - name: skip_host_checking
-          value: $(runnable.spec.inputs.skip_host_checking)$
-        - name: git_ssh_variant
-          value: $(runnable.spec.inputs.git_ssh_variant)$
-        - name: app_domain
-          value: $(runnable.spec.inputs.app_domain)$
-        #- name: integration_testing_matching_labels
-        #  value: $(runnable.spec.inputs.integration_testing_matching_labels)$
-      taskRef:
+      params: $(runnable.spec.inputs.tekton-params)$
+      pipelineRef:
         name: $(selected.metadata.name)$
-        kind: ClusterTask
-      workspaces:
-        - name: source
-          emptyDir: {}
-        - name: ssh-directory
-          secret:
-            secretName: git-ssh-secret        
----
-apiVersion: tekton.dev/v1beta1
-kind: ClusterTask
-metadata:
-  name: app-int-testing
-  labels:
-    apps.tanzu.vmware.com/pipeline: int-test
-spec:
-  params:
-    - name: url
-    - name: git_int_testing_repo
-    - name: git_int_testing_repo_branch
-    - name: skip_host_checking
-    - name: git_ssh_variant
-    - name: app_domain
-    - name: namespace
-  workspaces:
-    - name: source
-    - name: ssh-directory
-  steps:
-    - name: fetch-repo
-      ##'gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/git-init:v0.41.1'
-      ## image: 'harbor.h2o-4-2180.h2o.vmware.com/apps/git-init:latest'
-      image: 'harbor.h2o-4-2180.h2o.vmware.com/tap-install/tap-packages@sha256:b97474e8b8504f3602150e60d868890332585f3304cfd55d5f007a5ea5feb37a'
-      resources: {}
-      env:
-        - name: PARAM_URL
-          value: "$(params.git_int_testing_repo)"
-        - name: PRRAM_BRANCH
-          value: "$(params.git_int_testing_repo_branch)"
-        - name: GIT_SSH_VARIANT
-          value: "$(params.git_ssh_variant)"
-        - name: CHECKOUT_DIR
-          value: "$(workspaces.source.path)"
-        - name: DELI_IMAGE
-          value: "$(params.url)"
-      script: |
-        #!/usr/bin/env sh
-        set -eux
-        ##if [[ -n "${SKIP_HOST_CHECK}" && "${SKIP_HOST_CHECK}" = true ]]
-        ##then
-        ##  export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-        ##fi
-        ##if [[ -n "${GIT_SSH_VARIANT}" ]]
-        ##then
-        ##  export GIT_SSH_VARIANT="${GIT_SSH_VARIANT}"
-        ##fi
-
-        echo ${DELI_IMAGE}
-        echo ${PRRAM_BRANCH}
-        echo ${CHECKOUT_DIR}
-        ssh_config_file=$(mktemp)
-
-        echo "
-        UserKnownHostsFile /tekton/creds/.ssh/known_hosts
-        Include $(credentials.path)/.ssh/config
-        " > $ssh_config_file
-        export GIT_SSH_COMMAND="ssh -F $ssh_config_file"
-
-        # export GIT_SSH_COMMAND="ssh -i $(workspaces.ssh-directory.path)/ssh-privatekey -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
-        echo ${GIT_SSH_COMMAND}
-        #/ko-app/git-init \
-        #-url="${PARAM_URL}" \
-        #-revision="${PRRAM_BRANCH}" \
-        #-path="${CHECKOUT_DIR}"
-        git clone --depth 1 -b "${PRRAM_BRANCH}" "${PARAM_URL}" "${CHECKOUT_DIR}" 
-
-        cd "${CHECKOUT_DIR}"
-        ls -al
-    - name: integration-test
-      ##gcr.io/cloud-builders/mvn@sha256:69fa58eaf83abbd7ed29cbbcbd3252dae28b029f8fdea1a5dbad98c517aeaf54
-      image: harbor.h2o-4-2180.h2o.vmware.com/apps/mvn:latest
-      env:
-        - name: PARAM_APP_DOMAIN
-          value: "$(params.app_domain)"
-      workingDir: $(workspaces.source.path)
-      command: ["/usr/bin/mvn"]
-      args:
-        - test
-        - -Durl=$(PARAM_APP_DOMAIN)
