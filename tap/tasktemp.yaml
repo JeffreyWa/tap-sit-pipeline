@@ -39,6 +39,10 @@ spec:
     #@   return data.values.deployment.url
     #@ end
 
+    #@ def test_source_url():
+    #@   return "http://fluxcd-source-controller.flux-system.svc.cluster.local./gitrepository/" + data.values.workload.metadata.namespace + "/" + data.values.workload.metadata.name + "/latest.tar.gz"
+    #@ end
+
     #@ def merge_labels(fixed_values):
     #@   labels = {}
     #@   if hasattr(data.values.workload.metadata, "labels"):
@@ -56,6 +60,7 @@ spec:
     #@     end
     #@   end
     #@   params.append({ "name": "url", "value": url() })
+    #@   params.append({ "name": "test_source_url", "value": test_source_url() })
     #@   return params
     #@ end    
     ---
