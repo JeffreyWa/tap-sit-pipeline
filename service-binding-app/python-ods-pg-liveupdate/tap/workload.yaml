@@ -1,0 +1,27 @@
+apiVersion: carto.run/v1alpha1
+kind: Workload
+metadata:
+  name: python-ods-pg-liveupdate
+  namespace: workloads
+  labels:
+    apps.tanzu.vmware.com/workload-type: web
+spec:
+  params:
+  - name: annotations
+    value:
+      autoscaling.knative.dev/minScale: "1"  
+  - name: gitops_sub_path
+    value: config
+  - name: gitops_repository
+    value: ssh://git@gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/python-ods-pg-liveupdate-gitops.git
+  source:
+    git:
+      url: git@gitlab.h2o-4-2180.h2o.vmware.com/Jeffrey/python-ods-pg-liveupdate.git
+      ref:
+        branch: main 
+  serviceClaims:
+    - name: rmq
+      ref:
+        apiVersion: services.apps.tanzu.vmware.com/v1alpha1
+        kind: ClassClaim
+        name: my-rmq

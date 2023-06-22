@@ -1,0 +1,46 @@
+SOURCE_IMAGE = os.getenv("SOURCE_IMAGE", default='dev.local/python-rabbit-producer-source')
+LOCAL_PATH = os.getenv("LOCAL_PATH", default='.')
+NAMESPACE = os.getenv("NAMESPACE", default='workloads')
+OUTPUT_TO_NULL_COMMAND = os.getenv("OUTPUT_TO_NULL_COMMAND", default=' > /dev/null ')
+CLASS_CLAIM = 'my-rmq'
+
+allow_k8s_contexts('tkg2-tap-cluster')
+
+###Create an on-demand rabitmq cluster
+k8s_yaml('tap/rmq.yaml')
+k8s_resource(new_name='my-rmq-server',
+             objects=['my-rmq'],
+             extra_pod_selectors=[{'services.apps.tanzu.vmware.com/name': 'my-rmq'}],
+             pod_readiness='ignore')
+             
+'''
+Check the rmq clsuter untile its status is ready
+Weird, kubectl implementation of jsonpath is limited, we can't use 
+kubectl wait --for jsonpath='{.status.conditions[?(@.type=="Ready")].status}'=True classclaim bigcorp-rmq-1 -n workloads
+'''
+local_resource(
+  'rabbitmq-cluster-ready',
+  cmd='kubectl wait --for=condition=Ready classclaim %s -n %s --timeout=300s' % (CLASS_CLAIM, NAMESPACE),
+  resource_deps=['my-rmq-server']
+  )
+'''
+k8s_custom_deploy(
+    'python-ods-pg-liveupdate',
+    apply_cmd="tanzu apps workload apply -f tap/workload.yaml --debug --live-update" +
+               " --local-path " + LOCAL_PATH +
+               " --namespace " + NAMESPACE +
+               " --source-image " + SOURCE_IMAGE +
+               " --yes " +
+               OUTPUT_TO_NULL_COMMAND +
+               " && kubectl get workload python-ods-pg-liveupdate --namespace " + NAMESPACE + " -o yaml",
+    delete_cmd="tanzu apps workload delete -f tap/workload.yaml --namespace " + NAMESPACE + " --yes",
+    deps=['.'],
+    container_selector='workload',
+    live_update=[
+      sync('.', '/workspace')
+    ]
+)
+
+k8s_resource('python-ods-pg-liveupdate', port_forwards=["8080:8080"],
+            extra_pod_selectors=[{'serving.knative.dev/service': 'python-ods-pg-liveupdate'}])
+'''

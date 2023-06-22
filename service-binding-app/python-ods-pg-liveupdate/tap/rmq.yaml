@@ -1,0 +1,12 @@
+---
+apiVersion: services.apps.tanzu.vmware.com/v1alpha1
+kind: ClassClaim
+metadata:
+  name: my-rmq
+  namespace: workloads
+spec:
+  classRef:
+    name: bigcorp-rabbitmq
+  parameters:
+    storageGB: 1
+    replicas: 1
