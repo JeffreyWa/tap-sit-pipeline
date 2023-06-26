@@ -23,7 +23,6 @@ local_resource(
   cmd='kubectl wait --for=condition=Ready classclaim %s -n %s --timeout=300s' % (CLASS_CLAIM, NAMESPACE),
   resource_deps=['my-rmq-server']
   )
-'''
 k8s_custom_deploy(
     'python-ods-pg-liveupdate',
     apply_cmd="tanzu apps workload apply -f tap/workload.yaml --debug --live-update" +
@@ -43,4 +42,3 @@ k8s_custom_deploy(
 
 k8s_resource('python-ods-pg-liveupdate', port_forwards=["8080:8080"],
             extra_pod_selectors=[{'serving.knative.dev/service': 'python-ods-pg-liveupdate'}])
-'''
