@@ -1,0 +1,41 @@
+apiVersion: carto.run/v1alpha1
+kind: ClusterRunTemplate
+metadata:
+  name: tekton-sonarqube-taskrun
+  labels:
+    apps.tanzu.vmware.com/sonarqube: "sonarqube"
+spec:
+  outputs:
+    revision: spec.params[?(@.name=="source-revision")].value
+    url:      spec.params[?(@.name=="source-url")].value
+
+
+  template:
+    apiVersion: tekton.dev/v1beta1
+    kind: TaskRun
+    metadata:
+      generateName: code-analysis-$(runnable.metadata.name)$-
+      labels: $(runnable.metadata.labels)$
+    spec:
+      serviceAccountName: $(runnable.spec.inputs.serviceAccount)$
+      params:
+      - name: source-url
+        value: $(runnable.spec.inputs.source-url)$
+      - name: source-revision
+        value: $(runnable.spec.inputs.source-revision)$
+
+      taskRef:
+        name: $(selected.metadata.name)$
+
+      workspaces:
+        - name: custom-maven-settings
+          secret:
+            secretName: maven-settings
+        - name: supplychain-workspace
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+                - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 512Mi

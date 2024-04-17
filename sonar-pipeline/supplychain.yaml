@@ -1,0 +1,218 @@
+apiVersion: carto.run/v1alpha1
+kind: ClusterSupplyChain
+metadata:
+  annotations:
+  name: source-scan-to-url
+spec:
+  params:
+  - default: ""
+    name: ca_cert_data
+  - name: maven_repository_url
+    value: https://repo.maven.apache.org/maven2
+  - default: main
+    name: gitops_branch
+  - default: supplychain
+    name: gitops_user_name
+  - default: supplychain
+    name: gitops_user_email
+  - default: supplychain@cluster.local
+    name: gitops_commit_message
+  - default: ""
+    name: gitops_ssh_secret
+  - default: git-ssh-secret
+    name: gitops_credentials_secret
+  - default: ""
+    name: gitops_commit_branch
+  resources:
+  - name: source-provider
+    params:
+    - default: default
+      name: serviceAccount
+    - default: git-ssh-secret
+      name: source_credentials_secret
+    templateRef:
+      kind: ClusterSourceTemplate
+      name: source-template
+#
+# Sonarqube resource
+#
+  - name: sonarqube-scan
+    sources:
+    - name: source
+      resource: source-provider
+    templateRef:
+      kind: ClusterSourceTemplate
+      name: sonarqube-template
+#
+# END Sonarqube resource
+#
+
+  - name: image-provider
+    params:
+    - default: default
+      name: serviceAccount
+    - name: registry
+      value:
+        ca_cert_data: |
+          -----BEGIN CERTIFICATE-----
+          MIIDKzCCAhOgAwIBAgIUf3q9vx155yKKMNHf9E/S3YItAL4wDQYJKoZIhvcNAQEL
+          BQAwJTEjMCEGA1UEAwwaaDJvLTQtMjMzMzIucGV6LnZtd2FyZS5jb20wHhcNMjQw
+          NDA5MTQxNjIyWhcNMzQwNDA3MTQxNjIyWjAlMSMwIQYDVQQDDBpoMm8tNC0yMzMz
+          Mi5wZXoudm13YXJlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+          AI21h/76zh2TSNURftJw5/v+VwYXNinBoOEtfPkwWW9pl81OnJO1yTmFzyKDLUzc
+          yBHh6pGJoelffbNb96ifp4CSk3qy/zY1UrqRWSMp2qS0GH4Fe96BFLzjQUBlOrNe
+          Ce0vg0Eqkq7aNYCciRZC37y+K3zZmf2Gj96T3cEefBwEwTwO8Oekr5q8ckD09ACG
+          JODaADFvah4dfUn96vX25wFLLBes+Lu/NeHKYmzkWCy6kff43691sMy7M50CzwSm
+          i3YWYqPGGjSTlDurYPPF/ik50hR4KfC35DK48YsuayOGszaiMuTeWdFtvqIgf0yq
+          xtwvY67pblunBpYzf03Zw3MCAwEAAaNTMFEwHQYDVR0OBBYEFEDX+Z3i629FKnqw
+          OhKx0otqkOVEMB8GA1UdIwQYMBaAFEDX+Z3i629FKnqwOhKx0otqkOVEMA8GA1Ud
+          EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIweWjA54Dsvq1QMd4mIH1fe
+          XB4I6avVcjaDMAoyd4GT3b7e7vEdWdT24T/8wumYHUKqCIUKKro0YbVduinqwj6K
+          iIuUVEEX1SB24hM41kxia0Hja5VXmU9y4V4NBi+dps1RakgfXbi0zXSixZsnzyfV
+          o36ovxbnjetWlb2NO2jycEvsFrUECqS5yWGBn9EIgnREqje7+1E+Ou25L17yXqTa
+          ESmMjJYGQlw1uvWR3kDXpYhVogmoaPsTQJqXTYVFKl4G96kOT96MJsWFVP8fvA/Q
+          hxjyFEWdZ2jLiV4lOjb3D53CV36TenjCKairk0fskVJ1GfgVbGBL3zfg3ky/ZF8=
+          -----END CERTIFICATE-----
+        repository: tap/workloads
+        server: harbor.h2o-4-23332.h2o.vmware.com
+    - default: default
+      name: clusterBuilder
+    - default: ./Dockerfile
+      name: dockerfile
+    - default: ./
+      name: docker_build_context
+    - default: []
+      name: docker_build_extra_args
+    sources:
+    - name: source
+      resource: sonarqube-scan
+    templateRef:
+      kind: ClusterImageTemplate
+      options:
+      - name: kpack-template
+        selector:
+          matchFields:
+          - key: spec.params[?(@.name=="dockerfile")]
+            operator: DoesNotExist
+      - name: kaniko-template
+        selector:
+          matchFields:
+          - key: spec.params[?(@.name=="dockerfile")]
+            operator: Exists
+  - images:
+    - name: image
+      resource: image-provider
+    name: config-provider
+    params:
+    - default: default
+      name: serviceAccount
+    templateRef:
+      kind: ClusterConfigTemplate
+      name: convention-template
+  - configs:
+    - name: config
+      resource: config-provider
+    name: app-config
+    templateRef:
+      kind: ClusterConfigTemplate
+      options:
+      - name: config-template
+        selector:
+          matchLabels:
+            apps.tanzu.vmware.com/workload-type: web
+      - name: server-template
+        selector:
+          matchLabels:
+            apps.tanzu.vmware.com/workload-type: server
+      - name: worker-template
+        selector:
+          matchLabels:
+            apps.tanzu.vmware.com/workload-type: worker
+  - configs:
+    - name: app_def
+      resource: app-config
+    name: service-bindings
+    templateRef:
+      kind: ClusterConfigTemplate
+      name: service-bindings
+  - configs:
+    - name: app_def
+      resource: service-bindings
+    name: api-descriptors
+    templateRef:
+      kind: ClusterConfigTemplate
+      name: api-descriptors
+  - configs:
+    - name: config
+      resource: api-descriptors
+    name: config-writer
+    params:
+    - default: default
+      name: serviceAccount
+    - name: registry
+      value:
+        ca_cert_data: |
+          -----BEGIN CERTIFICATE-----
+          MIIDKzCCAhOgAwIBAgIUf3q9vx155yKKMNHf9E/S3YItAL4wDQYJKoZIhvcNAQEL
+          BQAwJTEjMCEGA1UEAwwaaDJvLTQtMjMzMzIucGV6LnZtd2FyZS5jb20wHhcNMjQw
+          NDA5MTQxNjIyWhcNMzQwNDA3MTQxNjIyWjAlMSMwIQYDVQQDDBpoMm8tNC0yMzMz
+          Mi5wZXoudm13YXJlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+          AI21h/76zh2TSNURftJw5/v+VwYXNinBoOEtfPkwWW9pl81OnJO1yTmFzyKDLUzc
+          yBHh6pGJoelffbNb96ifp4CSk3qy/zY1UrqRWSMp2qS0GH4Fe96BFLzjQUBlOrNe
+          Ce0vg0Eqkq7aNYCciRZC37y+K3zZmf2Gj96T3cEefBwEwTwO8Oekr5q8ckD09ACG
+          JODaADFvah4dfUn96vX25wFLLBes+Lu/NeHKYmzkWCy6kff43691sMy7M50CzwSm
+          i3YWYqPGGjSTlDurYPPF/ik50hR4KfC35DK48YsuayOGszaiMuTeWdFtvqIgf0yq
+          xtwvY67pblunBpYzf03Zw3MCAwEAAaNTMFEwHQYDVR0OBBYEFEDX+Z3i629FKnqw
+          OhKx0otqkOVEMB8GA1UdIwQYMBaAFEDX+Z3i629FKnqwOhKx0otqkOVEMA8GA1Ud
+          EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIweWjA54Dsvq1QMd4mIH1fe
+          XB4I6avVcjaDMAoyd4GT3b7e7vEdWdT24T/8wumYHUKqCIUKKro0YbVduinqwj6K
+          iIuUVEEX1SB24hM41kxia0Hja5VXmU9y4V4NBi+dps1RakgfXbi0zXSixZsnzyfV
+          o36ovxbnjetWlb2NO2jycEvsFrUECqS5yWGBn9EIgnREqje7+1E+Ou25L17yXqTa
+          ESmMjJYGQlw1uvWR3kDXpYhVogmoaPsTQJqXTYVFKl4G96kOT96MJsWFVP8fvA/Q
+          hxjyFEWdZ2jLiV4lOjb3D53CV36TenjCKairk0fskVJ1GfgVbGBL3zfg3ky/ZF8=
+          -----END CERTIFICATE-----
+        repository: tap/workloads
+        server: harbor.h2o-4-23332.h2o.vmware.com
+    templateRef:
+      kind: ClusterTemplate
+      name: config-writer-template
+  - name: deliverable
+    params:
+    - name: registry
+      value:
+        ca_cert_data: |
+          -----BEGIN CERTIFICATE-----
+          MIIDKzCCAhOgAwIBAgIUf3q9vx155yKKMNHf9E/S3YItAL4wDQYJKoZIhvcNAQEL
+          BQAwJTEjMCEGA1UEAwwaaDJvLTQtMjMzMzIucGV6LnZtd2FyZS5jb20wHhcNMjQw
+          NDA5MTQxNjIyWhcNMzQwNDA3MTQxNjIyWjAlMSMwIQYDVQQDDBpoMm8tNC0yMzMz
+          Mi5wZXoudm13YXJlLmNvbTCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB
+          AI21h/76zh2TSNURftJw5/v+VwYXNinBoOEtfPkwWW9pl81OnJO1yTmFzyKDLUzc
+          yBHh6pGJoelffbNb96ifp4CSk3qy/zY1UrqRWSMp2qS0GH4Fe96BFLzjQUBlOrNe
+          Ce0vg0Eqkq7aNYCciRZC37y+K3zZmf2Gj96T3cEefBwEwTwO8Oekr5q8ckD09ACG
+          JODaADFvah4dfUn96vX25wFLLBes+Lu/NeHKYmzkWCy6kff43691sMy7M50CzwSm
+          i3YWYqPGGjSTlDurYPPF/ik50hR4KfC35DK48YsuayOGszaiMuTeWdFtvqIgf0yq
+          xtwvY67pblunBpYzf03Zw3MCAwEAAaNTMFEwHQYDVR0OBBYEFEDX+Z3i629FKnqw
+          OhKx0otqkOVEMB8GA1UdIwQYMBaAFEDX+Z3i629FKnqwOhKx0otqkOVEMA8GA1Ud
+          EwEB/wQFMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAIweWjA54Dsvq1QMd4mIH1fe
+          XB4I6avVcjaDMAoyd4GT3b7e7vEdWdT24T/8wumYHUKqCIUKKro0YbVduinqwj6K
+          iIuUVEEX1SB24hM41kxia0Hja5VXmU9y4V4NBi+dps1RakgfXbi0zXSixZsnzyfV
+          o36ovxbnjetWlb2NO2jycEvsFrUECqS5yWGBn9EIgnREqje7+1E+Ou25L17yXqTa
+          ESmMjJYGQlw1uvWR3kDXpYhVogmoaPsTQJqXTYVFKl4G96kOT96MJsWFVP8fvA/Q
+          hxjyFEWdZ2jLiV4lOjb3D53CV36TenjCKairk0fskVJ1GfgVbGBL3zfg3ky/ZF8=
+          -----END CERTIFICATE-----
+        repository: tap/workloads
+        server: harbor.h2o-4-23332.h2o.vmware.com
+    templateRef:
+      kind: ClusterTemplate
+      name: deliverable-template
+
+  selector:
+    apps.tanzu.vmware.com/use-sonarqube: "true" 
+
+  selectorMatchExpressions:
+  - key: apps.tanzu.vmware.com/workload-type
+    operator: In
+    values:
+    - web
+    - server
+    - worker

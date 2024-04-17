@@ -1,0 +1,38 @@
+gitlab: glpat-Uh2zjqctyZnDhjWvdFhy
+
+sonar: sqp_16fc3f5b7f593247ba0091c95940356531976e3b
+
+mvn clean verify sonar:sonar \
+  -Dsonar.projectKey=jeffrey_spring-petclinic_cff26d1c-d76a-4f18-b77d-f82c04279a45 \
+  -Dsonar.projectName='spring-petclinic' \
+  -Dsonar.host.url=http://sonar.h2o-4-23332.h2o.vmware.com \
+  -Dsonar.token=sqp_16fc3f5b7f593247ba0091c95940356531976e3b
+
+
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: maven-settings
+type: service.binding/maven
+stringData:
+  type: maven
+  provider: sample
+  settings.xml: |
+    <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">
+      <localRepository>./.m2/repository</localRepository>
+    </settings>
+
+
+apiVersion: v1
+kind: Secret
+metadata:
+  name: sonar-settings
+type: Opaque
+Data:
+  sonar-host: http://sonar.h2o-4-23332.h2o.vmware.com
+  sonar-token: sqp_16fc3f5b7f593247ba0091c95940356531976e3b
+
+  
