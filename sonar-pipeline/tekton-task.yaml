@@ -93,7 +93,10 @@ spec:
           echo "sonar.sources=." >> sonar-project.properties
           echo "sonar.exclusions=./src/main/resources/**/*" >> sonar-project.properties
           echo "sonar.java.binaries=./target/classes/" >> sonar-project.properties
+          echo "sonar.qualitygate.wait=true" >> sonar-project.properties
+          echo "sonar.qualitygate.timeout=300" >> sonar-project.properties
         fi
+
         echo "---------------------------"
         cat $(workspaces.supplychain-workspace.path)/sonar-project.properties
 
