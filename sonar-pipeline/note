@@ -35,5 +35,4 @@ Data:
   sonar-host: http://sonar.h2o-4-23332.h2o.vmware.com
   sonar-token: sqp_16fc3f5b7f593247ba0091c95940356531976e3b
 
-http://fluxcd-source-controller.flux-system.svc.cluster.local./gitrepository/dev/spring-petclinic/3bdf527fcef4d4e72ce0286696e0bc5cd48ca0b9.tar.gz
-main@sha1:3bdf527fcef4d4e72ce0286696e0bc5cd48ca0b9  
+  

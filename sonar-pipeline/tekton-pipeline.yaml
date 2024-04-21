@@ -32,10 +32,12 @@ spec:
           secret:
             secretName: maven-settings
         - name: supplychain-workspace
+          emptyDir: {}
+        - name: local-repo
           volumeClaimTemplate:
             spec:
               accessModes:
                 - ReadWriteOnce
               resources:
                 requests:
-                  storage: 512Mi
+                  storage: 256Mi
